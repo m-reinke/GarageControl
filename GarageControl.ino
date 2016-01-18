@@ -1,20 +1,43 @@
-#include "WebCommand.h"
-#include "GarageExec.h"
-#include <siphash_2_4_asm.h>
+/*
+
+
+
+
+
+
+
+
+*/
+
 #include <SipHash_2_4.h>
+#include <SD.h>
+#include <EEPROM.h>
 #include <HexConversionUtils.h>
+
+#include "Global.h"
+
+#ifdef ETHERSHIELD
+#include <SPI.h>
 #include <EthernetUdp.h>
 #include <EthernetServer.h>
 #include <EthernetClient.h>
 #include <Ethernet.h>
+#include "IpSetupEtherShield.h"
+#endif
+
+#ifdef CC3000SHIELD
+#include <SPI.h>
+#include <Adafruit_CC3000_Server.h>
+#include <Adafruit_CC3000.h>
 #include <Dns.h>
 #include <Dhcp.h>
 #include <ccspi.h>
-#include <Adafruit_CC3000_Server.h>
-#include <Adafruit_CC3000.h>
-#include <SPI.h>
-#include <SD.h>
-#include <EEPROM.h>
+#include "IpSetupCc3000.h"
+#endif
+
+
+#include "WebCommand.h"
+#include "GarageExec.h"
 
 #include "Constants.h"
 #include "LedControl.h"
@@ -25,6 +48,8 @@
 #include "WebParser.h"
 #include "GarageExec.h"
 #include "WebPages.h"
+
+#include"HashTest.h"
 
 LedControl led;
 
@@ -45,7 +70,7 @@ void setup()
 	webPages.begin(&garageSensor);
 	garageExec.begin(&webPages);
 
-	garageWeb.begin(&led, &webPages, &garageExec);
+	webParser.begin(&led, &webPages, &garageExec);
 }
 
 void loop()
@@ -54,5 +79,5 @@ void loop()
 	led.execute();
 	garageMotor.execute(); 
 
-	garageWeb.execute();
+	webParser.execute();
 }

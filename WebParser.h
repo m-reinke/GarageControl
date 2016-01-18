@@ -19,28 +19,75 @@
 #include "WebSession.h"
 #include "Constants.h"
 #include "LedBase.h"
+#include "IpSetupBase.h"
 #include "WebExecBase.h"
 #include "WebCommand.h"
 
-
-
-class GarageWeb
+/// <summary>
+/// Class to parse inquiries from the web server 
+/// Parses incoming URLs, fills the command object 
+/// and tries to get the command executed
+/// </summary>
+class WebParser
 {
   public:
-    GarageWeb();
-    void execute();
+    WebParser();
+	/// <summary>
+	/// Executes this instance. Has to be placed in the loop function of the ino file
+	/// </summary>
+	void execute();
+
+	/// <summary>
+	/// Initializes the web parser and passes required helper objects.
+	/// </summary>
+	/// <param name="led">The led controller.</param>
+	/// <param name="webPages">The web pages output class.</param>
+	/// <param name="webExec">The executing object.</param>
 	void begin(LedBase *led, WebPages *webPages, WebExecBase *webExec);
-    void executeCommand (char *pchUrlTail);
+
+	/// <summary>
+	/// Fatal error during initialization. Output error message do serial port, set LED to red and stop execution.
+	/// </summary>
+	/// <param name="msg">The error message.</param>
+	void fatalError(char * msg);
+
+	/// <summary>
+	/// Parses and executes the command.
+	/// Execute immediatedly, if it is an internal command - otherwise have it executed by the <seealso>WebExec</seealso> object
+	/// </summary>
+	/// <param name="urlPath">The URL path.</param>
+	/// <param name="pchUrlTail">The partial URL tail -  after the command keyword.</param>
+	void executeCommand(char *urlPath, char *pchUrlTail);
 	WebPages *_webPages;
 	WebExecBase *_webExec;
 	WebSession webSession;
-  private:  
-	void readParams();
+  private:
+	  /// <summary>
+	  /// Parses the URL tail and reads the parameters.
+	  /// </summary>
+	  /// <param name="urlPath">The full URL path.</param>
+	  /// <param name="pchUrlTail">The URL tail.</param>
+	  void readParams(char *urlPath, char *pchUrlTail);
 
-	WebCommand command;
+	  /// <summary>
+	  /// Executes the administrative set user command.
+	  /// </summary>
+	  /// <param name="cmd">The command.</param>
+	  /// <returns></returns>
+	  bool setUser(WebCommand * cmd);
+
+	  /// <summary>
+	  /// The led controll instance (for initialization)
+	  /// </summary>
+	  LedBase *led;
+
+	  /// <summary>
+	  /// The command instance
+	  /// </summary>
+	  WebCommand command;
 };
 
-extern GarageWeb garageWeb;
+extern WebParser webParser;
 
 #endif
 

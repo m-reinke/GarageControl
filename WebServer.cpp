@@ -1,16 +1,8 @@
-// 
+// Moved from WebDuino.h
 // 
 // 
 
 #include "WebServer.h"
-
-#ifdef CC3000SHIELD
-
-Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, 
-										 ADAFRUIT_CC3000_IRQ,	
-										 ADAFRUIT_CC3000_VBAT); // you can change this clock speed but DI
-
-#endif
 
 /********************************************************************
  * IMPLEMENTATION
@@ -51,6 +43,9 @@ void WebServer::httpSuccess(const char *contentType, const char *extraHeaders)
 void WebServer::begin()
 {
   m_server.begin();
+#if WEBDUINO_SERIAL_DEBUGGING > 1
+  Serial.println(F("Server started listening"));
+#endif
 }
 
 void WebServer::setDefaultCommand(Command *cmd)
@@ -276,7 +271,16 @@ void WebServer::processConnection(char *buff, int *bufflen)
 {
   int urlPrefixLen = strlen(m_urlPrefix);
 
+#if WEBDUINO_SERIAL_DEBUGGING > 5
+  Serial.print(".");
+#endif
+
   m_client = m_server.available();
+#if WEBDUINO_SERIAL_DEBUGGING > 1
+  if(m_client)
+    Serial.println("available");
+#endif
+
 
   if (m_client && m_client.connected()) {
     m_readingContent = false;
@@ -312,11 +316,17 @@ void WebServer::processConnection(char *buff, int *bufflen)
 
       if (strcmp(buff, "/robots.txt") == 0)
       {
-        noRobots(requestType);
+#if WEBDUINO_SERIAL_DEBUGGING > 1
+		  Serial.println("*** robots ***");
+#endif
+		  noRobots(requestType);
       }
       else if (strcmp(buff, "/favicon.ico") == 0)
       {
-        favicon(requestType);
+#if WEBDUINO_SERIAL_DEBUGGING > 1
+		  Serial.println("*** favicon ***");
+#endif
+		  httpNoContent();
       }
     }
     // Only try to dispatch command if request type and prefix are correct.
@@ -339,14 +349,6 @@ void WebServer::processConnection(char *buff, int *bufflen)
 #endif
     reset();
   }
-}
-
-bool WebServer::checkCredentials(const char authCredentials[45])
-{
-  char basic[7] = "Basic ";
-  if((0 == strncmp(m_authCredentials,basic,6)) &&
-     (0 == strcmp(authCredentials, m_authCredentials + 6))) return true;
-  return false;
 }
 
 void WebServer::httpFail()
@@ -389,19 +391,6 @@ void WebServer::favicon(ConnectionType type)
   }
 }
 
-void WebServer::httpUnauthorized()
-{
-  P(failMsg) =
-    "HTTP/1.0 401 Authorization Required" CRLF
-    WEBDUINO_SERVER_HEADER
-    "Content-Type: text/html" CRLF
-    "WWW-Authenticate: Basic realm=\"" WEBDUINO_AUTH_REALM "\"" CRLF
-    CRLF
-    WEBDUINO_AUTH_MESSAGE;
-
-  printP(failMsg);
-}
-
 void WebServer::httpServerError()
 {
   P(failMsg) =
@@ -424,24 +413,7 @@ void WebServer::httpNoContent()
 
   printP(noContentMsg);
 }
-/*
-void WebServer::httpSuccess(const char *contentType,
-                            const char *extraHeaders)
-{
-  P(successMsg1) =
-    "HTTP/1.0 200 OK" CRLF
-    WEBDUINO_SERVER_HEADER
-    "Access-Control-Allow-Origin: *" CRLF
-    "Content-Type: ";
 
-  printP(successMsg1);
-  print(contentType);
-  printCRLF();
-  if (extraHeaders)
-    print(extraHeaders);
-  printCRLF();
-}
-*/
 void WebServer::httpSeeOther(const char *otherURL)
 {
   P(seeOtherMsg) =
@@ -574,40 +546,6 @@ bool WebServer::expect(const char *str)
   return true;
 }
 
-bool WebServer::readInt(int &number)
-{
-  bool negate = false;
-  bool gotNumber = false;
-  int ch;
-  number = 0;
-
-  // absorb whitespace
-  do
-  {
-    ch = read();
-  } while (ch == ' ' || ch == '\t');
-
-  // check for leading minus sign
-  if (ch == '-')
-  {
-    negate = true;
-    ch = read();
-  }
-
-  // read digits to update number, exit when we find non-digit
-  while (ch >= '0' && ch <= '9')
-  {
-    gotNumber = true;
-    number = number * 10 + ch - '0';
-    ch = read();
-  }
-
-  push(ch);
-  if (negate)
-    number = -number;
-  return gotNumber;
-}
-
 void WebServer::readHeader(char *value, int valueLen)
 {
   int ch;
@@ -724,7 +662,6 @@ URLPARAM_RESULT WebServer::nextURLparam(char **tail, char *name, int nameLen,
   // clear out name and value so they'll be NUL terminated
   memset(name, 0, nameLen);
   memset(value, 0, valueLen);
-
   if (*s == 0)
     return URLPARAM_EOS;
   // Read the keyword name
@@ -787,6 +724,7 @@ URLPARAM_RESULT WebServer::nextURLparam(char **tail, char *name, int nameLen,
 
   if (need_value && (*s != 0))
   {
+
     keep_scanning = true;
     while (keep_scanning)
     {
@@ -919,28 +857,6 @@ void WebServer::processHeaders()
 
   while (1)
   {
-    if (expect("Content-Length:"))
-    {
-      readInt(m_contentLength);
-#if WEBDUINO_SERIAL_DEBUGGING > 1
-      Serial.print("\n*** got Content-Length of ");
-      Serial.print(m_contentLength);
-      Serial.print(" ***");
-#endif
-      continue;
-    }
-
-    if (expect("Authorization:"))
-    {
-      readHeader(m_authCredentials,51);
-#if WEBDUINO_SERIAL_DEBUGGING > 1
-      Serial.print("\n*** got Authorization: of ");
-      Serial.print(m_authCredentials);
-      Serial.print(" ***");
-#endif
-      continue;
-    }
-
     if (expect(CRLF CRLF))
     {
       m_readingContent = true;
@@ -953,44 +869,6 @@ void WebServer::processHeaders()
       return;
     }
   }
-}
-
-void WebServer::outputCheckboxOrRadio(const char *element, const char *name,
-                                      const char *val, const char *label,
-                                      bool selected)
-{/*
-  P(cbPart1a) = "<label><input type='";
-  P(cbPart1b) = "' name='";
-  P(cbPart2) = "' value='";
-  P(cbPart3) = "' ";
-  P(cbChecked) = "checked ";
-  P(cbPart4) = "/> ";
-  P(cbPart5) = "</label>";
-
-  printP(cbPart1a);
-  print(element);
-  printP(cbPart1b);
-  print(name);
-  printP(cbPart2);
-  print(val);
-  printP(cbPart3);
-  if (selected)
-    printP(cbChecked);
-  printP(cbPart4);
-  print(label);
-  printP(cbPart5);*/
-}
-
-void WebServer::checkBox(const char *name, const char *val,
-                         const char *label, bool selected)
-{
-//  outputCheckboxOrRadio("checkbox", name, val, label, selected);
-}
-
-void WebServer::radioButton(const char *name, const char *val,
-                            const char *label, bool selected)
-{
- // outputCheckboxOrRadio("radio", name, val, label, selected);
 }
 
 uint8_t WebServer::available(){

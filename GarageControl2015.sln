@@ -1,30 +1,47 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.23107.0
+VisualStudioVersion = 14.0.24720.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GarageControl", "GarageControl.vcxproj", "{ECE08A9E-C444-4500-9198-EAEA7E7D4D3D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "siphash", "..\siphash\siphash.vcxproj", "{215BE924-DB56-4278-A2D5-484BCA0E013F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{ECE08A9E-C444-4500-9198-EAEA7E7D4D3D}.Debug|x64.ActiveCfg = Debug|Win32
 		{ECE08A9E-C444-4500-9198-EAEA7E7D4D3D}.Debug|x86.ActiveCfg = Debug|Win32
 		{ECE08A9E-C444-4500-9198-EAEA7E7D4D3D}.Debug|x86.Build.0 = Debug|Win32
+		{ECE08A9E-C444-4500-9198-EAEA7E7D4D3D}.Release|x64.ActiveCfg = Release|Win32
 		{ECE08A9E-C444-4500-9198-EAEA7E7D4D3D}.Release|x86.ActiveCfg = Release|Win32
 		{ECE08A9E-C444-4500-9198-EAEA7E7D4D3D}.Release|x86.Build.0 = Release|Win32
+		{215BE924-DB56-4278-A2D5-484BCA0E013F}.Debug|x64.ActiveCfg = Debug|x64
+		{215BE924-DB56-4278-A2D5-484BCA0E013F}.Debug|x64.Build.0 = Debug|x64
+		{215BE924-DB56-4278-A2D5-484BCA0E013F}.Debug|x86.ActiveCfg = Debug|Win32
+		{215BE924-DB56-4278-A2D5-484BCA0E013F}.Debug|x86.Build.0 = Debug|Win32
+		{215BE924-DB56-4278-A2D5-484BCA0E013F}.Release|x64.ActiveCfg = Release|x64
+		{215BE924-DB56-4278-A2D5-484BCA0E013F}.Release|x64.Build.0 = Release|x64
+		{215BE924-DB56-4278-A2D5-484BCA0E013F}.Release|x86.ActiveCfg = Release|Win32
+		{215BE924-DB56-4278-A2D5-484BCA0E013F}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(TeamFoundationVersionControl) = preSolution
-		SccNumberOfProjects = 2
+		SccNumberOfProjects = 3
 		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
 		SccTeamFoundationServer = http://whs:8080/tfs/defaultcollection
 		SccLocalPath0 = .
 		SccProjectUniqueName1 = GarageControl.vcxproj
 		SccLocalPath1 = .
+		SccProjectUniqueName2 = ..\\siphash\\siphash.vcxproj
+		SccProjectName2 = ../siphash
+		SccLocalPath2 = ..\\siphash
 	EndGlobalSection
 EndGlobal

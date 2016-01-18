@@ -22,13 +22,15 @@ LedControl::LedControl()
 
 void LedControl::SetLed(unsigned int color, unsigned int blinkStatus)
 {
+	// return, if nothing changed
 	if (color == Color && blinkStatus == BlinkStatus)	
 		return;
 	
+	// Set variables
 	Color = color;
 	BlinkStatus = blinkStatus;
 		
-	
+	// set duration variables - or directly switch LED pins for static blink states
    switch (BlinkStatus) {
      case ALWAYS_ON:
 	   SetLedLines (color);
@@ -48,7 +50,8 @@ void LedControl::SetLed(unsigned int color, unsigned int blinkStatus)
 		_LightDuration = FlashLightDuration;
 		break;
    }
-				
+		
+   // set LED pins and remember state
    SetLedLines (color);
 	_lastChange = millis() - _LightDuration;
 	_blinkIsOn = true;
@@ -69,12 +72,14 @@ unsigned int LedControl::InvertColor (unsigned int color)
 
 void LedControl::SetLedLine (unsigned int color, unsigned int lineColor, unsigned int line)
 {
+   //calculate line state
    unsigned int lineState = ((color & lineColor) > 0) ? LED_ON : LED_OFF;
    digitalWrite (line, lineState);
 }
 
 void LedControl::SetLedLines (unsigned int color)
 {
+  // set each of the RGB lines 
   SetLedLine (color, ColorRed  , OutRed  );
   SetLedLine (color, ColorGreen, OutGreen);	
   SetLedLine (color, ColorBlue , OutBlue );
@@ -82,6 +87,7 @@ void LedControl::SetLedLines (unsigned int color)
 
 void LedControl::execute()
 {
+   // only do something, if currently blinking
    if (BlinkStatus >= BLINK)
      Blink();
 }
@@ -90,6 +96,7 @@ void LedControl::Blink()
 {
 	unsigned int now = millis();
 	
+	// check, if time to switch has passed
 	unsigned int duration;	
 	if (now > _lastChange)
 	{

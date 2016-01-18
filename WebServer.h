@@ -1,3 +1,11 @@
+/*
+  Modified WebDuino library class.
+
+  Stripped of several HTML related functions
+
+*/
+
+
 /* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil;  c-file-style: "k&r"; c-basic-offset: 2; -*-
 
    Webduino, a simple Arduino web server
@@ -75,7 +83,7 @@ extern Adafruit_CC3000 cc3000;
 #endif
 
 #ifndef WEBDUINO_URL_PATH_COMMAND_LENGTH
-#define WEBDUINO_URL_PATH_COMMAND_LENGTH 8
+#define WEBDUINO_URL_PATH_COMMAND_LENGTH 16
 #endif
 
 #ifndef WEBDUINO_FAIL_MESSAGE
@@ -138,7 +146,7 @@ extern Adafruit_CC3000 cc3000;
 // before including WebServer.h to have incoming requests logged to
 // the serial port.
 #ifndef WEBDUINO_SERIAL_DEBUGGING
-  #define WEBDUINO_SERIAL_DEBUGGING 4
+  #define WEBDUINO_SERIAL_DEBUGGING 2
 #endif
 #if WEBDUINO_SERIAL_DEBUGGING
   #include <HardwareSerial.h>
@@ -248,14 +256,6 @@ public:
   // output raw data stored in program memory
   void writeP(const unsigned char *data, size_t length);
 
-  // output HTML for a radio button
-  void radioButton(const char *name, const char *val,
-                   const char *label, bool selected);
-
-  // output HTML for a checkbox
-  void checkBox(const char *name, const char *val,
-                const char *label, bool selected);
-
   // returns next character or -1 if we're at end-of-stream
   int read();
 
@@ -266,11 +266,6 @@ public:
   // consume any character if false, so can be used to try out
   // different expected values.
   bool expect(const char *expectedStr);
-
-  // returns true if a number, with possible whitespace in front, was
-  // read from the server stream.  number will be set with the new
-  // value or 0 if nothing was read.
-  bool readInt(int &number);
 
   // reads a header value, stripped of possible whitespace in front,
   // from the server stream
@@ -289,14 +284,6 @@ public:
   // (see the typedef for codes)
   URLPARAM_RESULT nextURLparam(char **tail, char *name, int nameLen,
                                char *value, int valueLen);
-
-  // compare string against credentials in current request
-  //
-  // authCredentials must be Base64 encoded outside of Webduino
-  // (I wanted to be easy on the resources)
-  //
-  // returns true if strings match, false otherwise
-  bool checkCredentials(const char authCredentials[45]);
 
   // output headers and a message indicating a server error
   void httpFail();

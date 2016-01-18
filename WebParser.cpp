@@ -1,53 +1,22 @@
-/*
-  Web Server
- 
- A simple web server that shows the value of the analog input pins.
- using an Arduino Wiznet Ethernet shield.
- 
- Circuit:
- * Ethernet shield attached to pins 10, 11, 12, 13
-  
- created 18 Dec 2009
- by David A. Mellis
- modified 9 Apr 2012
- by Tom Igoe
- 
- */
-
-#include "Global.h"
-
-#include <SPI.h>
-#ifdef ETHERSHIELD
-#include <Ethernet.h>
-#endif 
-#ifdef CC3000SHIELD
-#include <Adafruit_CC3000.h>
-#endif
-
-#include "Arduino.h"
 
 #ifndef WEBDUINO_NO_IMPLEMENTATION
 #define WEBDUINO_NO_IMPLEMENTATION
 #endif
-#include "WebServer.h"
 
-#include "ConfigData.h"
-#include "WebSession.h"
-#include "GarageSensor.h"
-#include "GarageMotor.h"
 #include "WebParser.h"
-#include "WebPages.h"
-#include "Constants.h"
-#include "LedBase.h"
-#include "SipHash_2_4.h"
-#include "HexConversionUtils.h"
 
 
+// --------------- Prototypes passed to web server
 
-// --------------- Prototypes
+// root message, returning HTML
 void ShowWebRoot(WebServer &rServer, WebServer::ConnectionType Type, char *pchUrlTail, bool bTailComplete);
-void CommandMessage(WebServer &rServer, WebServer::ConnectionType Type, char *pchUrlTail, bool bTailComplete);
-bool IsValidLogin(WebServer &rServer);
+
+// message for specific message defined in the tail
+void UrlPathCommand(WebServer &server, WebServer::ConnectionType type,
+	char **url_path, char *url_tail,
+	bool tail_complete);
+
+// Just return page not found
 void ShowPageNotFound(WebServer &rServer, WebServer::ConnectionType Type, char *pchUrlTail, bool bTailComplete);
 
 
@@ -57,95 +26,65 @@ void ShowPageNotFound(WebServer &rServer, WebServer::ConnectionType Type, char *
 WebServer HttpServer("", 80);
 
 
-GarageWeb::GarageWeb(){
+WebParser::WebParser() {
 }
 
 
-void GarageWeb::begin(LedBase *led, WebPages *webPages, WebExecBase *webExec) {
-  this->_webPages = webPages;
-  this->_webExec = webExec;
+void WebParser::begin(LedBase *led, WebPages *webPages, WebExecBase *webExec) {
 
-  webPages->begin(&HttpServer);
+	this->_webExec = webExec;
+	this->_webPages = webPages;
+	this->led = led;
 
-  led->SetLed(ColorYellow, ALWAYS_ON);
-  delay(1000);
- 
-  HttpServer.setDefaultCommand(ShowWebRoot);
-  HttpServer.addCommand("command", CommandMessage);
-  HttpServer.addCommand("index.html", ShowWebRoot);
-  HttpServer.setFailureCommand(ShowPageNotFound);
+	// check coding
+	if (this->_webPages == NULL)
+	{
+		fatalError("Web Pages not initialized");
+	}
+	if (this->led == NULL)
+	{
+		fatalError("LED not initialized");
+	}
 
-  // start the Ethernet connection and the server:
-//  Ethernet.begin(mac, ip);  
+	// Open network interface
+	ipInitializer->open(true);
+
+	this->led->SetLed(ColorCyan, ALWAYS_ON);
+
+	// Start http server
+	webPages->begin(&HttpServer);
+
+	// initialize http server commands
+	HttpServer.setDefaultCommand(ShowWebRoot);
+	HttpServer.addCommand("index.html", ShowWebRoot);
+	HttpServer.setUrlPathCommand(UrlPathCommand);
+	HttpServer.setFailureCommand(ShowPageNotFound);
+
+	led->SetLed(ColorGreen, ALWAYS_ON);
+
 #if WEBDUINO_SERIAL_DEBUGGING > 1
-  Serial.println(F("\nInitializing..."));
+	Serial.println(F("Starting server"));
+#endif
+	HttpServer.begin();
+
+#if WEBDUINO_SERIAL_DEBUGGING > 1
+	Serial.println(F("Listening"));
 #endif
 
-#ifdef CC3000SHIELD
-  CC3KPrinter = &Serial;
-
-  if (!cc3000.begin())
-  {
-#if WEBDUINO_SERIAL_DEBUGGING > 1
-	  Serial.println(F("Couldn't begin()! Check your wiring?"));
-#endif
-	  while(1);
-  }
-  
-#if WEBDUINO_SERIAL_DEBUGGING > 1
-Serial.println(F("Connecting..."));
-#endif
-   
-#if WEBDUINO_SERIAL_DEBUGGING > 1
-Serial.println(configData.ssid);
-#endif
-    
-  if (!cc3000.connectToAP(configData.ssid, configData.wlanKey, WLAN_SECURITY, CONNECT_RETRIES)) {
-#if WEBDUINO_SERIAL_DEBUGGING > 1
-	  Serial.println(F("Failed!"));
-#endif
-	  while(1);
-  }
-  
-#if WEBDUINO_SERIAL_DEBUGGING > 1
-  Serial.println(F("Connected!"));
-#endif
-  
-  if (configData.useDHCP)
-  {  
-  
-  /* Wait for DHCP to complete */
-	#if WEBDUINO_SERIAL_DEBUGGING > 1
-	  Serial.println(F("Request DHCP"));
-	#endif
-	  while (!cc3000.checkDHCP())
-	  {
-		  delay(100); // ToDo: Insert a DHCP timeout!
-	  }
-  }
-#endif //CC3000SHIELD 
-#ifdef ETHERSHIELD
-
-  // connect with configuration
-  configData.initIp();
-
-#endif
-
-  led->SetLed(ColorPurple, ALWAYS_ON);
-  delay(1000);
-  
-  
-  HttpServer.begin();
-  
-  led->AllOff();
-  delay(1000);
-  
+	led->AllOff();
 }
 
-void GarageWeb::executeCommand(char *pchUrlTail)
+void WebParser::fatalError(char *msg) {
+	Serial.println(msg);
+	while (true);
+}
+
+
+void WebParser::executeCommand(char *urlPath, char *pchUrlTail)
 {
-	readParams();
+	readParams(urlPath, pchUrlTail);
 
+	// connect message handeled internally
 	if (command.equals(CMD_CONNECT))
 	{
 #if WEBDUINO_SERIAL_DEBUGGING > 1
@@ -156,53 +95,135 @@ void GarageWeb::executeCommand(char *pchUrlTail)
 		if (sessionId > 0)
 			_webPages->ConnectMessage(sessionId);
 		else
-			_webPages->ResultMessage(STATE_NO_SESSION);
+			// error if no session ID generated
+			_webPages->ErrorMessage(STATE_NO_USER, "No session id");
 
-		exit;
+		return;
+	}
+	// user admin messages handeled internally
+	else if (command.equals(CMD_USER))
+	{
+		// always run this in admin mode
+		command.userMode = UM_ADMIN;
+
+		if (webSession.verifyCommand(&command))
+		{
+			setUser(&command);
+			_webPages->ResultMessage(STATE_OK);
+		}
+		else
+		{
+			_webPages->ErrorMessage(STATE_NO_SESSION, "Verification error");
+		}
+		return;
 	}
 
-	_webExec->setLevelRequired(command);
+	// -- external commands from here --
+
+	// let webExec decide the required user level
+	_webExec->setLevelRequired(&command);
 
 	if (!webSession.verifyCommand(&command))
 	{
-		_webPages->ResultMessage(STATE_NO_SESSION);
+		_webPages->ErrorMessage(STATE_NO_SESSION, "Verification error");
 	}
 
-	_webExec->execCommand(command);
+	// now execute the command (and return the reyply from webExec)
+	_webExec->execCommand(&command);
 }
 
-void GarageWeb::readParams()
+void WebParser::readParams(char *urlPath, char *pchUrlTail)
 {
-  const int nMaxParameterBuffer = 20;
-  char achName[nMaxParameterBuffer];
-  char achValue[nMaxParameterBuffer];
+	// Buffer variables
+	const int nMaxParameterBuffer = 25;
+	char achName[nMaxParameterBuffer];
+	char achValue[nMaxParameterBuffer];
 
-  command.startNewCommand();
- 
-  // Work through all the parameters supplied 
-  while (HttpServer.readPOSTparam(achName, sizeof(achName), achValue, sizeof(achValue)))
-  {
-	String name (achName);
-	String value (achValue);
-	#if WEBDUINO_SERIAL_DEBUGGING > 1
-	Serial.print(F("param "));
-	Serial.println(name);
-	Serial.print(F(": "));
-	Serial.println(value);
-	#endif
-     
-	command.addParam(name, value);
-	
-  }
+#if WEBDUINO_SERIAL_DEBUGGING > 1
+	Serial.print(F("Command \""));
+	Serial.print(urlPath);
+	Serial.println(F("\""));
 
+	Serial.print(F("Tail: \""));
+	Serial.print(pchUrlTail);
+	Serial.println(F("\""));
+#endif
+
+	// reading parameters always starts a new command
+	command.startNewCommand(urlPath);
+
+	bool hasParam = false;
+	char *tail = pchUrlTail;
+
+	// this could be used, if runing in POST mode
+	//while (HttpServer.readPOSTparam(achName, sizeof(achName), achValue, sizeof(achValue)))
+
+	// Work through all the parameters supplied 
+	while (true)
+	{
+		// let the web server parse for the next param
+		URLPARAM_RESULT paramResult = HttpServer.nextURLparam(&tail, achName, sizeof(achName), achValue, sizeof(achValue));
+#if WEBDUINO_SERIAL_DEBUGGING > 5
+		Serial.print(F("paramResult "));
+		Serial.println(paramResult);
+#endif
+
+		if (paramResult != URLPARAM_OK)
+			break;
+
+#if WEBDUINO_SERIAL_DEBUGGING > 5
+		Serial.print(F("param "));
+		Serial.print(name);
+		Serial.print(F(": \""));
+		Serial.print(value);
+		Serial.print(F("\""));
+#endif
+
+		if (!command.addParam(achName, achValue))
+		{
+#if WEBDUINO_SERIAL_DEBUGGING > 5
+			Serial.println(F(" ignored"));
+#endif
+			break;
+		}
+		else
+		{
+#if WEBDUINO_SERIAL_DEBUGGING > 5
+			Serial.println(F(" added"));
+#endif
+		}
+		hasParam = true;
+	}
+
+	if (!hasParam)
+#if WEBDUINO_SERIAL_DEBUGGING > 1
+		Serial.println(F("No parameters"));
+#endif
+}
+
+bool WebParser::setUser(WebCommand * cmd)
+{
+	cmd->userMode = UM_ADMIN;
+
+	// extract and convert the parameters
+	uint8_t idx = cmd->getIntValue(KEY_USERIDX);
+
+	uint16_t id = cmd->getIntValue(KEY_SETUSERID);
+	uint16_t key = cmd->getIntValue(KEY_SETUSERKEY);
+	uint16_t mode = cmd->getIntValue(KEY_USERMODE);
+
+	configData.setUser(idx, id, key, mode);
+
+	return true;
 }
 
 
-void GarageWeb::execute()
+void WebParser::execute()
 {
-	char achBuffer[64];
+	char achBuffer[100];
 	int nBufferLength = sizeof(achBuffer);
 
+	// let the webserver check, if a new message has arrived
 	HttpServer.processConnection(achBuffer, &nBufferLength);
 }
 
@@ -211,41 +232,32 @@ void ShowWebRoot(WebServer &rServer, WebServer::ConnectionType Type, char *pchUr
 {
 	// We show the password entry page as the web root. Presents a form that asks for a password.
 	rServer.httpSuccess();
-	
-	switch (Type)
+
+	if (Type == WebServer::GET)
 	{
-		case WebServer::GET:
-			#if WEBDUINO_SERIAL_DEBUGGING > 1
-			Serial.println(F("*** GET ***"));
-			#endif
-			garageWeb._webPages->IndexPage();
-		break;
-
-		case WebServer::POST:
-			#if WEBDUINO_SERIAL_DEBUGGING > 1
-			Serial.println(F("*** POST ***"));
-			#endif
-			garageWeb._webPages->SendErrorPage();
-		break;
-
-		// None of these are expected, so we don't respond.
-		case WebServer::INVALID:
-		case WebServer::HEAD:
-		case WebServer::PUT:
-		case WebServer::DELETE:
-		case WebServer::PATCH:
-		default:
-		break;
+#if WEBDUINO_SERIAL_DEBUGGING > 1
+		Serial.println(F("*** GET ***"));
+#endif
+		webParser._webPages->IndexPage();
+	}
+	else
+	{
+#if WEBDUINO_SERIAL_DEBUGGING > 1
+		Serial.println(F("*** Request not supported ***"));
+		webParser._webPages->SendPageNotFound();
+#endif
 	}
 }
 
-void CommandMessage(WebServer &rServer, WebServer::ConnectionType Type, char *pchUrlTail, bool bTailComplete)
+void UrlPathCommand(WebServer &server, WebServer::ConnectionType type,
+	char **url_path, char *url_tail,
+	bool tail_complete)
 {
-
-	if ( Type == WebServer::POST)
+	// this is handeled by the webParser
+	if (type == WebServer::GET)
 	{
-			rServer.httpSuccess("text/xml; charset=utf-8");
-			garageWeb.executeCommand(pchUrlTail);
+		server.httpSuccess("text/xml; charset=utf-8");
+		webParser.executeCommand(*url_path, url_tail);
 	}
 }
 
@@ -253,23 +265,7 @@ void ShowPageNotFound(WebServer &rServer, WebServer::ConnectionType Type, char *
 {
 	// We show the password entry page as the web root. Presents a form that asks for a password.
 	HttpServer.httpSuccess();
+	webParser._webPages->SendPageNotFound();
+}
 
-	switch (Type)
-	{
-		case WebServer::GET:
-		case WebServer::POST:
-		garageWeb._webPages->SendPageNotFound();
-		break;
-
-		// None of these are expected, so we don't respond.
-		case WebServer::INVALID:
-		case WebServer::HEAD:
-		case WebServer::PUT:
-		case WebServer::DELETE:
-		case WebServer::PATCH:
-		default:
-		break;
-	}
-}  
-
-GarageWeb garageWeb;
+WebParser webParser;
